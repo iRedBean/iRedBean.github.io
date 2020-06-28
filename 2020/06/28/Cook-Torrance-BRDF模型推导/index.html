@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 4.2.1">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"iredbean.github.io","root":"/","scheme":"Gemini","version":"8.0.0-rc.3","exturl":false,"sidebar":{"position":"left","display":"always","padding":18,"offset":12},"copycode":false,"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":false,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn"}}};
+  </script>
+
+  <meta name="description" content="简介Cook-Torrance BRDF 模型是最常用的一个基于物理的 BRDF（Bidirectional Reflectance Distribution Function，双向反射分布函数）模型，电影、游戏等涉及图形渲染的领域都能见到它的身影。Cook-Torrance BRDF 模型基于微面元理论，具有简洁的表达式，但相关论文中给出的推导过程却比较难以理解。在本文中，我们先简要回顾辐射度量">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Cook-Torrance BRDF模型推导">
+<meta property="og:url" content="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/index.html">
+<meta property="og:site_name" content="LemonSky&#39;s Blog">
+<meta property="og:description" content="简介Cook-Torrance BRDF 模型是最常用的一个基于物理的 BRDF（Bidirectional Reflectance Distribution Function，双向反射分布函数）模型，电影、游戏等涉及图形渲染的领域都能见到它的身影。Cook-Torrance BRDF 模型基于微面元理论，具有简洁的表达式，但相关论文中给出的推导过程却比较难以理解。在本文中，我们先简要回顾辐射度量">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/microsurface.png">
+<meta property="og:image" content="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/g-term.png">
+<meta property="og:image" content="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/dm_do.png">
+<meta property="article:published_time" content="2020-06-28T12:09:14.000Z">
+<meta property="article:modified_time" content="2020-06-28T13:48:22.174Z">
+<meta property="article:author" content="LemonSky">
+<meta property="article:tag" content="公式推导">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/microsurface.png">
+
+<link rel="canonical" href="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>Cook-Torrance BRDF模型推导 | LemonSky's Blog</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  body { margin-top: 2rem; }
+
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before, .use-motion .logo-line-after {
+    transform: scaleX(1);
+  }
+
+  .search-pop-overlay, .sidebar-nav { display: none; }
+  .sidebar-panel { display: block; }
+  </style>
+  <div id="noscript-warning">Theme NexT works best with JavaScript enabled</div>
+</noscript>
+
+</head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <main class="main">
+      <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+        <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+        <span class="toggle-line toggle-line-first"></span>
+        <span class="toggle-line toggle-line-middle"></span>
+        <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <i class="logo-line-before"></i>
+      <h1 class="site-title">LemonSky's Blog</h1>
+      <i class="logo-line-after"></i>
+    </a>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于我</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-categories">
+
+    <a href="/categories/" rel="section"><i class="fa fa-th fa-fw"></i>分类</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#简介"><span class="nav-number">1.</span> <span class="nav-text">简介</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#辐射度量学"><span class="nav-number">2.</span> <span class="nav-text">辐射度量学</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#微面元理论"><span class="nav-number">3.</span> <span class="nav-text">微面元理论</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#法向分布函数"><span class="nav-number">3.1.</span> <span class="nav-text">法向分布函数</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#阴影遮挡函数"><span class="nav-number">3.2.</span> <span class="nav-text">阴影遮挡函数</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#推导BRDF公式"><span class="nav-number">4.</span> <span class="nav-text">推导BRDF公式</span></a></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="LemonSky"
+      src="/images/avatar.png">
+  <p class="site-author-name" itemprop="name">LemonSky</p>
+  <div class="site-description" itemprop="description">Tech otakus save the world !</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">4</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-categories">
+            <a href="/categories/">
+          
+        <span class="site-state-item-count">4</span>
+        <span class="site-state-item-name">分类</span></a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">6</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/iRedBean" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;iRedBean" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:lemonsky1995@gmail.com" title="E-Mail → mailto:lemonsky1995@gmail.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+  <div class="links-of-blogroll motion-element">
+    <div class="links-of-blogroll-title"><i class="fa fa-globe fa-fw"></i>
+      友情链接
+    </div>
+    <ul class="links-of-blogroll-list">
+        <li class="links-of-blogroll-item">
+          <a href="https://cs.nju.edu.cn/" title="https:&#x2F;&#x2F;cs.nju.edu.cn&#x2F;" rel="noopener" target="_blank">南京大学计算机系</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://sites.cs.ucsb.edu/~lingqi/teaching/games101.html" title="https:&#x2F;&#x2F;sites.cs.ucsb.edu&#x2F;~lingqi&#x2F;teaching&#x2F;games101.html" rel="noopener" target="_blank">现代计算机图形学入门</a>
+        </li>
+        <li class="links-of-blogroll-item">
+          <a href="https://forum.taichi.graphics/t/topic/272" title="https:&#x2F;&#x2F;forum.taichi.graphics&#x2F;t&#x2F;topic&#x2F;272" rel="noopener" target="_blank">高级物理引擎实战</a>
+        </li>
+    </ul>
+  </div>
+
+      </div>
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </header>
+
+      
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+
+
+      <div class="main-inner">
+        
+
+        <div class="content post posts-expand">
+          
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="https://iredbean.github.io/2020/06/28/Cook-Torrance-BRDF%E6%A8%A1%E5%9E%8B%E6%8E%A8%E5%AF%BC/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.png">
+      <meta itemprop="name" content="LemonSky">
+      <meta itemprop="description" content="Tech otakus save the world !">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="LemonSky's Blog">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          Cook-Torrance BRDF模型推导
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2020-06-28 20:09:14 / 修改时间：21:48:22" itemprop="dateCreated datePublished" datetime="2020-06-28T20:09:14+08:00">2020-06-28</time>
+            </span>
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-folder"></i>
+              </span>
+              <span class="post-meta-item-text">分类于</span>
+                <span itemprop="about" itemscope itemtype="http://schema.org/Thing">
+                  <a href="/categories/%E6%9D%90%E8%B4%A8%E5%BB%BA%E6%A8%A1/" itemprop="url" rel="index"><span itemprop="name">材质建模</span></a>
+                </span>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="简介"><a href="#简介" class="headerlink" title="简介"></a>简介</h2><p>Cook-Torrance BRDF 模型是最常用的一个基于物理的 BRDF（Bidirectional Reflectance Distribution Function，双向反射分布函数）模型，电影、游戏等涉及图形渲染的领域都能见到它的身影。Cook-Torrance BRDF 模型基于微面元理论，具有简洁的表达式，但相关论文中给出的推导过程却比较难以理解。在本文中，我们先简要回顾辐射度量学以及微面元理论，然后给出一个相对直观的推导过程。<br><a id="more"></a></p>
+<h2 id="辐射度量学"><a href="#辐射度量学" class="headerlink" title="辐射度量学"></a>辐射度量学</h2><p>辐射度量学中与 BRDF 息息相关的几个物理量分别是：辐射通量 $\Phi$、辐射照度 $E$ 以及辐射率 $L$。其中辐射通量定义为单位时间内的辐射能，即：</p>
+<script type="math/tex; mode=display">
+\Phi=\frac{\mathrm{d}Q}{\mathrm{d}t}</script><p>而辐射照度定义为单位面积上的辐射通量，即：</p>
+<script type="math/tex; mode=display">
+E=\frac{\mathrm{d}\Phi}{\mathrm{d}A}</script><p>然后是辐射率，它被定义为单位投影面积、单位立体角内的辐射通量，即：</p>
+<script type="math/tex; mode=display">
+L=\frac{\mathrm{d}E}{\mathrm{d}\omega\cos\theta}=\frac{\mathrm{d}^2\Phi}{\mathrm{d}A\mathrm{d}\omega\cos\theta}</script><p>渲染的目标就是计算辐射率，它可以被认为是一根光线的能量。最后是 BRDF，它被定义为出射辐射率微分 $\mathrm{d}L_o$ 与入射辐射照度微分 $\mathrm{d}E_i$ 的比值，即：</p>
+<script type="math/tex; mode=display">
+f_r=\frac{\mathrm{d}L_o}{\mathrm{d}E_i}</script><h2 id="微面元理论"><a href="#微面元理论" class="headerlink" title="微面元理论"></a>微面元理论</h2><p>如下图所示，微面元理论假设宏观表面是由一系列微观表面构成。微观表面非常非常小无法直接看到，因此我们累积微观表面反射的能量，并在宏观表面的角度看待反射，进而定义 BRDF。单独考虑每个微观表面十分困难，因此需要在统计意义上描述微观表面，这里就用到了法向分布函数 $D$ 和阴影遮挡函数 $G$。此外，虽然微观表面非常小，但这里仅仅考虑几何光学的影响，而忽略波动光学。</p>
+<p><img src="./microsurface.png" alt=""></p>
+<h3 id="法向分布函数"><a href="#法向分布函数" class="headerlink" title="法向分布函数"></a>法向分布函数</h3><p>法向分布函数 $D(\mathbf{m})$ 描述了微表面法向 $\mathbf{m}$ 的分布规律，对于给定的宏观表面面积微分 $\mathrm{d}A$ 以及立体角微分 $\mathrm{d}\omega_m$，可以通过 $D(\mathbf{m})\mathrm{d}A\mathrm{d}\omega_m$ 计算得到法向为 $\mathbf{m}$ 的微表面面积。</p>
+<p>一个合理的法向分布函数显然应该是非负的，且其在宏观表面上的投影是 $1$，即：</p>
+<script type="math/tex; mode=display">
+\int D(\mathbf{m})(\mathbf{m}\cdot\mathbf{n})\mathrm{d}\omega_m = 1</script><p>这里 $\mathbf{n}$ 是宏观表面法向，而 $\mathbf{m}\cdot\mathbf{n}$ 即得到投影的比例。</p>
+<h3 id="阴影遮挡函数"><a href="#阴影遮挡函数" class="headerlink" title="阴影遮挡函数"></a>阴影遮挡函数</h3><p>对于给定入射方向 $\mathbf{i}$ 以及出射方向 $\mathbf{o}$，阴影遮挡函数 $G(\mathbf{i},\mathbf{o},\mathbf{m})$ 描述了从两个方向均可见的微表面的比例，显然 $0\leq G(\mathbf{i},\mathbf{o},\mathbf{m}) \leq 1$。如下图所示，微表面之间会发生遮挡，因此只有其中一部分微表面才可以将 $\mathbf{i}$ 方向的入射光反射到 $\mathbf{o}$ 方向。$G$ 在掠射角的情况下对能量守恒起到了重要的作用。</p>
+<p><img src="./g-term.png" alt=""></p>
+<h2 id="推导BRDF公式"><a href="#推导BRDF公式" class="headerlink" title="推导BRDF公式"></a>推导BRDF公式</h2><p>我们从 BRDF 的定义出发，推导 Cook-Torrance BRDF 的公式。</p>
+<p>首先推导 BRDF 的分母，宏表面入射辐照度微分 $\mathrm{d}E_i$。根据辐射率 $L$ 的定义，可以很容易地得到：</p>
+<script type="math/tex; mode=display">
+\mathrm{d}E_i = L_i \mathrm{d}\omega_i (\mathbf{i}\cdot \mathbf{n})</script><p>这里 $\mathbf{i}$ 和 $\mathbf{n}$ 分别表示入射方向和法向方向，其内积即夹角余弦。</p>
+<p>然后关键即推导 BRDF 的分子，宏表面出射辐射率微分 $\mathrm{d}L_o$。由于微面元理论假设每个微表面都是完美镜面，因此仅有法向为 $\mathbf{i}$ 和 $\mathbf{o}$ 的半向量 $\mathbf{m}=\frac{\mathbf{i}+\mathbf{o}}{\vert \mathbf{i}+\mathbf{o} \vert}$ 的微表面才会影响结果。根据辐射率的定义，可以得到法向为 $\mathbf{m}$ 的微表面上入射的辐射通量微分：</p>
+<script type="math/tex; mode=display">
+\mathrm{d}^2\Phi_i=L_i\mathrm{d}A_m\mathrm{d}\omega_i(\mathbf{i}\cdot\mathbf{m})</script><p>而微表面的可见面积 $\mathrm{d}A_m$ 可以通过法向分布函数和阴影遮挡函数得到：</p>
+<script type="math/tex; mode=display">
+\mathrm{d}A_m = D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})\mathrm{d}A\mathrm{d}\omega_m</script><p>这里 $\mathrm{d}A$ 表示宏表面面积微分。注意上式右边具有两个微分符号，因此我们得到的实际上是入射辐射通量的三阶微分：</p>
+<script type="math/tex; mode=display">
+\mathrm{d}^3\Phi_i=L_i D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})\mathrm{d}A\mathrm{d}\omega_m\mathrm{d}\omega_i(\mathbf{i}\cdot\mathbf{m})</script><p>一个直观的理解是，入射的能量可以被反射到各个方向，而这里我们指定了出射方向，因此增加了一阶微分。根据菲涅尔定律，我们得到出射的辐射通量微分：</p>
+<script type="math/tex; mode=display">
+\mathrm{d}^3\Phi_o=F(\mathbf{i},\mathbf{m})\mathrm{d}^3\Phi_i</script><p>接下来从宏观表面的角度计算出射辐射率微分：</p>
+<script type="math/tex; mode=display">
+\begin{aligned}
+\mathrm{d}L_o &= \frac{\mathrm{d}^3\Phi_o}{\mathrm{d}A\mathrm{d}\omega_o(\mathbf{o}\cdot\mathbf{n})} \\
+&=\frac{F(\mathbf{i},\mathbf{m})L_i D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})\mathrm{d}A\mathrm{d}\omega_m\mathrm{d}\omega_i(\mathbf{i}\cdot\mathbf{m})}{\mathrm{d}A\mathrm{d}\omega_o(\mathbf{o}\cdot\mathbf{n})} \\
+&=\frac{F(\mathbf{i},\mathbf{m})L_i D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})\mathrm{d}\omega_m\mathrm{d}\omega_i(\mathbf{i}\cdot\mathbf{m})}{\mathrm{d}\omega_o(\mathbf{o}\cdot\mathbf{n})} 
+\end{aligned}</script><p>最后将 $\mathrm{d}E_i$ 和 $\mathrm{d}L_o$ 带入 BRDF 的定义式可以得到：</p>
+<script type="math/tex; mode=display">
+\begin{aligned}
+f_r(\mathbf{i},\mathbf{o},\mathbf{n}) &= \frac{\mathrm{d}L_o}{\mathrm{d}E_i} \\
+&= \frac{F(\mathbf{i},\mathbf{m})L_i D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})\mathrm{d}\omega_m\mathrm{d}\omega_i(\mathbf{i}\cdot\mathbf{m})}{L_i \mathrm{d}\omega_i\mathrm{d}\omega_o (\mathbf{i}\cdot \mathbf{n})(\mathbf{o}\cdot\mathbf{n})} \\
+&= \frac{F(\mathbf{i},\mathbf{m}) D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})(\mathbf{i}\cdot\mathbf{m})}{(\mathbf{i}\cdot \mathbf{n})(\mathbf{o}\cdot\mathbf{n})}\vert \frac{\mathrm{d}\omega_m}{\mathrm{d}\omega_o} \vert
+\end{aligned}</script><p>由于 $\mathbf{m}$ 是半向量，因此 $\vert \frac{\mathrm{d}\omega_m}{\mathrm{d}\omega_o} \vert$ 可以使用下图的直观方式进行计算：</p>
+<p><img src="./dm_do.png" alt=""></p>
+<p>将 $\vert \frac{\mathrm{d}\omega_m}{\mathrm{d}\omega_o} \vert=\frac{1}{4(\mathbf{o}\cdot\mathbf{m})}$ 带入得到最终的结果：</p>
+<script type="math/tex; mode=display">
+\begin{aligned}
+f_r(\mathbf{i},\mathbf{o},\mathbf{n}) &= \frac{F(\mathbf{i},\mathbf{m}) D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})(\mathbf{i}\cdot\mathbf{m})}{(\mathbf{i}\cdot \mathbf{n})(\mathbf{o}\cdot\mathbf{n})} \frac{1}{4(\mathbf{o}\cdot\mathbf{m})} \\
+&= \frac{F(\mathbf{i},\mathbf{m}) D(\mathbf{m})G(\mathbf{i},\mathbf{o},\mathbf{m})}{4(\mathbf{i}\cdot \mathbf{n})(\mathbf{o}\cdot\mathbf{n})} \qquad \because (\mathbf{o}\cdot\mathbf{m})=(\mathbf{i}\cdot\mathbf{m})
+\end{aligned}</script>
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E5%85%AC%E5%BC%8F%E6%8E%A8%E5%AF%BC/" rel="tag"># 公式推导</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2020/06/27/%E7%94%9F%E6%88%90%E6%95%B0%E5%AD%97%E7%BB%98%E7%94%BB%E5%85%89%E6%95%88/" rel="prev" title="生成数字绘画光效">
+      <i class="fa fa-chevron-left"></i> 生成数字绘画光效
+    </a></div>
+      <div class="post-nav-item"></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+        </div>
+        
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2020</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">LemonSky</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.js.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+
+  
+  <script>
+    (function(){
+      var bp = document.createElement('script');
+      var curProtocol = window.location.protocol.split(':')[0];
+      bp.src = (curProtocol === 'https') ? 'https://zz.bdstatic.com/linksubmit/push.js' : 'http://push.zhanzhang.baidu.com/push.js';
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(bp, s);
+    })();
+  </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
+  
+      
+
+<script>
+  if (typeof MathJax === 'undefined') {
+    window.MathJax = {
+      loader: {
+        source: {
+          '[tex]/amsCd': '[tex]/amscd',
+          '[tex]/AMScd': '[tex]/amscd'
+        }
+      },
+      tex: {
+        inlineMath: {'[+]': [['$', '$']]},
+        tags: 'ams'
+      },
+      options: {
+        renderActions: {
+          findScript: [10, doc => {
+            document.querySelectorAll('script[type^="math/tex"]').forEach(node => {
+              const display = !!node.type.match(/; *mode=display/);
+              const math = new doc.options.MathItem(node.textContent, doc.inputJax[0], display);
+              const text = document.createTextNode('');
+              node.parentNode.replaceChild(text, node);
+              math.start = {node: text, delim: '', n: 0};
+              math.end = {node: text, delim: '', n: 0};
+              doc.math.push(math);
+            });
+          }, '', false],
+          insertedScript: [200, () => {
+            document.querySelectorAll('mjx-container').forEach(node => {
+              let target = node.parentNode;
+              if (target.nodeName.toLowerCase() === 'li') {
+                target.parentNode.classList.add('has-jax');
+              }
+            });
+          }, '', false]
+        }
+      }
+    };
+    (function () {
+      var script = document.createElement('script');
+      script.src = '//cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+      script.defer = true;
+      document.head.appendChild(script);
+    })();
+  } else {
+    MathJax.startup.document.state(0);
+    MathJax.texReset();
+    MathJax.typeset();
+  }
+</script>
+
+    
+
+  
+
+</body>
+</html>
